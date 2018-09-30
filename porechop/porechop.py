@@ -717,7 +717,7 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
         print('', flush=True, file=print_dest)
 
     if pickle_name:
-        with open(pickle_name, 'w') as f:
+        with open(pickle_name, 'wb') as f:
             pickle.dump(reads, f)
 
 
