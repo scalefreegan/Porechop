@@ -74,7 +74,7 @@ def main():
     output_reads(reads, args.format, args.output, read_type, args.verbosity,
                  args.discard_middle, args.min_split_read_size, args.print_dest,
                  args.barcode_dir, args.input, args.untrimmed, args.threads,
-                 args.discard_unassigned)
+                 args.discard_unassigned, args.pickle)
 
 
 def get_arguments():
@@ -589,7 +589,7 @@ def display_read_middle_trimming_summary(reads, discard_middle, verbosity, print
 
 def output_reads(reads, out_format, output, read_type, verbosity, discard_middle,
                  min_split_size, print_dest, barcode_dir, input_filename,
-                 untrimmed, threads, discard_unassigned):
+                 untrimmed, threads, discard_unassigned, pickle_name):
     if verbosity > 0:
         trimmed_or_untrimmed = 'untrimmed' if untrimmed else 'trimmed'
         if barcode_dir is not None:
@@ -716,8 +716,9 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
     if verbosity > 0:
         print('', flush=True, file=print_dest)
 
-    if args.pickle:
-        pickle.dump(args.pickle)
+    if pickle_name:
+        with open(pickle_name, 'w') as f:
+            pickle.dump(reads, f)
 
 
 def output_progress_line(completed, total, print_dest, end_newline=False, step=10):
