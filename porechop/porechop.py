@@ -27,7 +27,6 @@ from .misc import load_fasta_or_fastq, print_table, red, bold_underline, MyHelpF
 from .adapters import ADAPTERS, make_full_native_barcode_adapter, make_full_rapid_barcode_adapter
 from .nanopore_read import NanoporeRead
 from .version import __version__
-import pickle
 
 def main():
     args = get_arguments()
@@ -74,7 +73,7 @@ def main():
     output_reads(reads, args.format, args.output, read_type, args.verbosity,
                  args.discard_middle, args.min_split_read_size, args.print_dest,
                  args.barcode_dir, args.input, args.untrimmed, args.threads,
-                 args.discard_unassigned, args.pickle)
+                 args.discard_unassigned, args.reversing_adapters)
 
 
 def get_arguments():
@@ -105,8 +104,6 @@ def get_arguments():
                                  'a file and stderr if reads are printed to stdout')
     main_group.add_argument('-t', '--threads', type=int, default=default_threads,
                             help='Number of threads to use for adapter alignment')
-    main_group.add_argument('--pickle', default=None,
-                            help='Filename for optional pickle output containing information about trimmed reads')
 
     barcode_group = parser.add_argument_group('Barcode binning settings',
                                               'Control the binning of reads based on barcodes '
@@ -145,6 +142,9 @@ def get_arguments():
     adapter_search_group.add_argument('--scoring_scheme', type=str, default='3,-6,-5,-2',
                                       help='Comma-delimited string of alignment scores: match, '
                                            'mismatch, gap open, gap extend')
+    adapter_search_group.add_argument('--reversing_adapters', type=list, default=[],
+                                      help='List of adapter names that trigger reverse '
+                                           'complementation of sequence')
 
     end_trim_group = parser.add_argument_group('End adapter settings',
                                                'Control the trimming of adapters from read ends')
@@ -221,7 +221,7 @@ def get_arguments():
     return args
 
 
-def load_reads(input_file_or_directory, verbosity, print_dest, check_read_count):
+def load_reads(input_file_or_directory, verbosity, print_dest, check_read_count, reversing_adapters):
 
     # If the input is a file, just load reads from that file. The check reads will just be the
     # first reads from that file.
@@ -589,7 +589,7 @@ def display_read_middle_trimming_summary(reads, discard_middle, verbosity, print
 
 def output_reads(reads, out_format, output, read_type, verbosity, discard_middle,
                  min_split_size, print_dest, barcode_dir, input_filename,
-                 untrimmed, threads, discard_unassigned, pickle_name):
+                 untrimmed, threads, discard_unassigned, reversing_adapters):
     if verbosity > 0:
         trimmed_or_untrimmed = 'untrimmed' if untrimmed else 'trimmed'
         if barcode_dir is not None:
@@ -715,13 +715,6 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
 
     if verbosity > 0:
         print('', flush=True, file=print_dest)
-
-    if pickle_name:
-        with open(pickle_name, 'wb') as f:
-            pickle.dump(reads, f)
-            if verbosity > 0:
-                print('\nSaved pickle to ' + os.path.abspath(pickle_name), file=print_dest)
-
 
 def output_progress_line(completed, total, print_dest, end_newline=False, step=10):
     if step > 1 and completed % step != 0 and completed != total:

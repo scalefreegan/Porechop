@@ -20,7 +20,7 @@ from .misc import yellow, red, add_line_breaks_to_sequence, END_FORMATTING, RED,
 
 class NanoporeRead(object):
 
-    def __init__(self, name, seq, quals):
+    def __init__(self, name, seq, quals, reversing_adapters):
         self.name = name
 
         self.seq = seq
@@ -47,6 +47,11 @@ class NanoporeRead(object):
         self.barcode_call = 'none'
 
         self.albacore_barcode_call = None
+
+        self.reversing_adapters = reversing_adapters
+        self.reverse = False # keep track of whether sequence is reversed
+
+        self.umi_call = 'none'
 
     def get_seq_with_start_end_adapters_trimmed(self):
         if not self.start_trim_amount and not self.end_trim_amount:
@@ -88,12 +93,36 @@ class NanoporeRead(object):
         split_read_parts = [x for x in split_read_parts if len(x[0]) >= min_split_read_size]
         return split_read_parts
 
+    def reverse_complement(self,seq):
+        # adapted from: https://stackoverflow.com/questions/25188968/reverse-complement-of-dna-strand-using-python
+        alt_map = {'ins':'0'}
+        complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+        def reverse_complement(seq):
+            for k,v in alt_map.items():
+                seq = seq.replace(k,v)
+                bases = list(seq)
+                bases = reversed([complement.get(base,base) for base in bases])
+                bases = ''.join(bases)
+            for k,v in alt_map.items():
+                bases = bases.replace(v,k)
+            return bases
+
+    def determine_reverse(self):
+        # maybe in the future i need to rank the adapters?
+        start_adapters = [i.name for i in self.start_adapter_alignments if i.name in self.reversing_adapters]
+        end_adapters = [i.name for i in self.end_adapter_alignments if i.name in self.reversing_adapters]
+        merged_adapters = start_adapters + end_adapters
+        if len(start_adapters) > 0:
+            self.reverse = True
+
     def get_fasta(self, min_split_read_size, discard_middle, untrimmed=False):
         if not self.middle_trim_positions:
             if untrimmed:
                 seq = self.seq
             else:
                 seq = self.get_seq_with_start_end_adapters_trimmed()
+                if self.reverse:
+                    seq = self.reverse_complement(seq)
             if not seq:  # Don't return empty sequences
                 return ''
             return ''.join(['>', self.name, '\n', add_line_breaks_to_sequence(seq, 70)])
@@ -105,7 +134,10 @@ class NanoporeRead(object):
                 read_name = add_number_to_read_name(self.name, i + 1)
                 if not split_read_part[0]:  # Don't return empty sequences
                     return ''
-                seq = add_line_breaks_to_sequence(split_read_part[0], 70)
+                seq = split_read_part[0]
+                if self.reverse:
+                    seq = self.reverse_complement(seq)
+                seq = add_line_breaks_to_sequence(seq[0], 70)
                 fasta_str += ''.join(['>', read_name, '\n', seq])
             return fasta_str
 
@@ -119,6 +151,9 @@ class NanoporeRead(object):
                 quals = self.get_quals_with_start_end_adapters_trimmed()
             if not seq:  # Don't return empty sequences
                 return ''
+            if self.reverse:
+                seq = self.reverse_complement(seq)
+                quals = quals[::-1]
             return ''.join(['@', self.name, '\n', seq, '\n+\n', quals, '\n'])
         elif discard_middle:
             return ''
@@ -128,8 +163,11 @@ class NanoporeRead(object):
                 read_name = add_number_to_read_name(self.name, i + 1)
                 if not split_read_part[0]:  # Don't return empty sequences
                     return ''
-                fastq_str += ''.join(['@', read_name, '\n', split_read_part[0], '\n+\n',
-                                      split_read_part[1], '\n'])
+                if self.reverse:
+                    seq = self.reverse_complement(split_read_part[0])
+                    quals = split_read_part[1][::-1]
+                fastq_str += ''.join(['@', read_name, '\n', seq, '\n+\n',
+                                      quals, '\n'])
             return fastq_str
 
     def align_adapter_set(self, adapter_set, end_size, scoring_scheme_vals):
@@ -332,6 +370,20 @@ class NanoporeRead(object):
                 output += '    albacore barcode call: ' + self.albacore_barcode_call + '\n'
             output += '    final barcode call:    ' + self.barcode_call + '\n'
         return output
+
+    def full_start_end_output_tabdelim(self, end_size, extra_trim_size, check_barcodes):
+        def get_alignment_string(self, aln, position):
+            thisname = [i.split("=")[0] for i in self.name.split(" ")]
+            output = "\t".join(thisname)
+            return output += '\t' + aln[0].name + '\t' + str(aln[1]) + '\t' + \
+                   str(aln[2]) + '\t' + str(aln[3]) + '\t' + str(aln[4]) + \
+                   self.barcode_call + '\t' + self.umi_call
+        if self.start_adapter_alignments:
+            for a in self.start_adapter_alignments:
+                output += get_alignment_string(a) + '\n'
+        if self.end_adapter_alignments:
+            for a in self.end_adapter_alignments:
+                output += get_alignment_string(a) + '\n'
 
     def formatted_middle_seq(self):
         """
