@@ -719,6 +719,8 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
     if pickle_name:
         with open(pickle_name, 'wb') as f:
             pickle.dump(reads, f)
+            if verbosity > 0:
+                print('\nSaved pickle to ' + os.path.abspath(pickle_name), file=print_dest)
 
 
 def output_progress_line(completed, total, print_dest, end_newline=False, step=10):
