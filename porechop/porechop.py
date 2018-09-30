@@ -27,7 +27,7 @@ from .misc import load_fasta_or_fastq, print_table, red, bold_underline, MyHelpF
 from .adapters import ADAPTERS, make_full_native_barcode_adapter, make_full_rapid_barcode_adapter
 from .nanopore_read import NanoporeRead
 from .version import __version__
-
+import pickle
 
 def main():
     args = get_arguments()
@@ -105,6 +105,8 @@ def get_arguments():
                                  'a file and stderr if reads are printed to stdout')
     main_group.add_argument('-t', '--threads', type=int, default=default_threads,
                             help='Number of threads to use for adapter alignment')
+    main_group.add_argument('--pickle', default=None,
+                            help='Filename for optional pickle output containing information about trimmed reads')
 
     barcode_group = parser.add_argument_group('Barcode binning settings',
                                               'Control the binning of reads based on barcodes '
@@ -713,6 +715,9 @@ def output_reads(reads, out_format, output, read_type, verbosity, discard_middle
 
     if verbosity > 0:
         print('', flush=True, file=print_dest)
+
+    if args.pickle:
+        pickle.dump(args.pickle)
 
 
 def output_progress_line(completed, total, print_dest, end_newline=False, step=10):

@@ -99,6 +99,40 @@ ADAPTERS = [Adapter('SQK-NSK007',
                     start_sequence=('PCR_tail_2_start', 'TTAACCTACTTGCCTGTCGCTCTATCTTC'),
                     end_sequence=  ('PCR_tail_2_end',   'GAAGATAGAGCGACAGGCAAGTAGGTTAA')),
 
+            # Custom adapters added by Aaron to remove library construction adapters
+            # with both Smart-Seq2 and TeloPrime approaches
+	    # only keep 5 Ts/As otherwise have matching problems
+            Adapter('teloprime',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
+                    start_sequence=('telo_5', 'TGGATTGATATGTAATACGACTCACTATAG'),
+                    end_sequence=  ('telo_3',   'AAAAACGCCTGAGA')),
+	    Adapter('teloprimeR',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
+                    start_sequence=('telo_5_r', 'TCTCAGGCGTTTTT'),
+                    end_sequence=  ('telo_3_r',   'CTATAGTGAGTCGTATTACATATCAATCCA')),
+	    Adapter('teloprime_umi',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3
+		    start_sequence=('telo_5', 'TGGATTGATATGTAATACGACTCACTATAG'),
+                    end_sequence=  ('telo_3_umi',   'GTTGTACCAATTCTAGTCGAATTAGATAGC')),
+	    Adapter('teloprime_umi_r',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3‘
+                    start_sequence=('telo_5_umi_r', 'GCTATCTAATTCGACTAGAATTGGTACAAC'),
+		    end_sequence=('telo_3_r', 'CTATAGTGAGTCGTATTACATATCAATCCA')),
+            Adapter('smartseq2',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
+                    start_sequence=('telo_5', 'AAGCAGTGGTATCAACGCAGAGT'),
+                    end_sequence=  ('telo_3',   'ACTCTGCGTTGATACCACTGCTT')),
+            Adapter('smartseq2_umi',
+                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                    # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
+                    start_sequence=('telo_5', 'AAGCAGTGGTATCAACGCAGA'),
+                    end_sequence=  ('telo_3',   'TCTGCGTTGATACCACTGCTT')),
+
 
             # 1D^2 kit adapters are interesting. ONT provided the following sequences on their site:
             #   start: GGCGTCTGCTTGGGTGTTTAACCTTTTTGTCAGAGAGGTTCCAAGTCAGAGAGGTTCCT
