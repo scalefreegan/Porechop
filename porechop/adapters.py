@@ -107,21 +107,21 @@ ADAPTERS = [Adapter('SQK-NSK007',
                     # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
                     start_sequence=('telo_5', 'TGGATTGATATGTAATACGACTCACTATAG'),
                     end_sequence=  ('telo_3',   'AAAAACGCCTGAGA')),
-	    Adapter('teloprimeR',
-                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
-                    # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
-                    start_sequence=('telo_5_r', 'TCTCAGGCGTTTTT'),
-                    end_sequence=  ('telo_3_r',   'CTATAGTGAGTCGTATTACATATCAATCCA')),
-	    Adapter('teloprime_umi',
-                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
-                    # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3
-		    start_sequence=('telo_5', 'TGGATTGATATGTAATACGACTCACTATAG'),
-                    end_sequence=  ('telo_3_umi',   'GTTGTACCAATTCTAGTCGAATTAGATAGC')),
-	    Adapter('teloprime_umi_r',
-                    # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
-                    # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3‘
-                    start_sequence=('telo_5_umi_r', 'GCTATCTAATTCGACTAGAATTGGTACAAC'),
-		    end_sequence=('telo_3_r', 'CTATAGTGAGTCGTATTACATATCAATCCA')),
+    	    Adapter('teloprimeR',
+                        # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                        # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘
+                        start_sequence=('telo_5_r', 'TCTCAGGCGTTTTT'),
+                        end_sequence=  ('telo_3_r',   'CTATAGTGAGTCGTATTACATATCAATCCA')),
+    	    Adapter('teloprime_umi',
+                        # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                        # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3
+    		            start_sequence=('telo_5', 'TGGATTGATATGTAATACGACTCACTATAG'),
+                        end_sequence=  ('telo_3_umi',   'GTTGTACCAATTCTAGTCGAATTAGATAGC')),
+    	    Adapter('teloprime_umi_r',
+                        # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
+                        # RP: 5’ – GCTATCTAATTCGACTAGAATTGGTACAACN(30)CGGCGTTTTTTTTTTTTTTTTTTTT – 3‘
+                        start_sequence=('telo_5_umi_r', 'GCTATCTAATTCGACTAGAATTGGTACAAC'),
+    		            end_sequence=('telo_3_r', 'CTATAGTGAGTCGTATTACATATCAATCCA')),
             Adapter('smartseq2',
                     # FP: 5’ – TGGATTGATATGTAATACGACTCACTATAG – 3‘
                     # RP: 5’ – TCTCAGGCGTTTTTTTTTTTTTTTTTT – 3‘

@@ -31,7 +31,7 @@ from .version import __version__
 def main():
     args = get_arguments()
     reads, check_reads, read_type = load_reads(args.input, args.verbosity, args.print_dest,
-                                               args.check_reads)
+                                               args.check_reads, args.reversing_adapters)
 
     matching_sets = find_matching_adapter_sets(check_reads, args.verbosity, args.end_size,
                                                args.scoring_scheme_vals, args.print_dest,
@@ -56,7 +56,7 @@ def main():
                                    args.scoring_scheme_vals, args.print_dest, args.min_trim_size,
                                    args.threads, check_barcodes, args.barcode_threshold,
                                    args.barcode_diff, args.require_two_barcodes,
-                                   forward_or_reverse_barcodes)
+                                   forward_or_reverse_barcodes, args.umi_length)
         display_read_end_trimming_summary(reads, args.verbosity, args.print_dest)
 
         if not args.no_split:
@@ -142,7 +142,7 @@ def get_arguments():
     adapter_search_group.add_argument('--scoring_scheme', type=str, default='3,-6,-5,-2',
                                       help='Comma-delimited string of alignment scores: match, '
                                            'mismatch, gap open, gap extend')
-    adapter_search_group.add_argument('--reversing_adapters', type=list, default=[],
+    adapter_search_group.add_argument('--reversing_adapters', type=list, default=['teloprimeR','teloprime_umi_r'],
                                       help='List of adapter names that trigger reverse '
                                            'complementation of sequence')
 
@@ -184,6 +184,10 @@ def get_arguments():
     middle_trim_group.add_argument('--min_split_read_size', type=int, default=1000,
                                    help='Post-split read pieces smaller than this many base pairs '
                                         'will not be outputted')
+
+    umi_group = parser.add_argument_group('UMI settings')
+    umi_group.add_argument('--umi_length', type=int, default=30,
+                           help='Expected length of UMI sequence')
 
     help_args = parser.add_argument_group('Help')
     help_args.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
@@ -231,9 +235,9 @@ def load_reads(input_file_or_directory, verbosity, print_dest, check_read_count,
             print(input_file_or_directory, flush=True, file=print_dest)
         reads, read_type = load_fasta_or_fastq(input_file_or_directory)
         if read_type == 'FASTA':
-            reads = [NanoporeRead(x[2], x[1], '') for x in reads]
+            reads = [NanoporeRead(x[2], x[1], '', reversing_adapters) for x in reads]
         else:  # FASTQ
-            reads = [NanoporeRead(x[4], x[1], x[3]) for x in reads]
+            reads = [NanoporeRead(x[4], x[1], x[3], reversing_adapters) for x in reads]
         check_reads = reads[:check_read_count]
 
     # If the input is a directory, assume it's an Albacore directory and search it recursively for
@@ -427,7 +431,7 @@ def add_full_barcode_adapter_sets(matching_sets):
 def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_trim_size,
                                end_threshold, scoring_scheme_vals, print_dest, min_trim_size,
                                threads, check_barcodes, barcode_threshold, barcode_diff,
-                               require_two_barcodes, forward_or_reverse_barcodes):
+                               require_two_barcodes, forward_or_reverse_barcodes, umi_length):
     if verbosity > 0:
         print(bold_underline('Trimming adapters from read ends'),
               file=print_dest)
@@ -445,6 +449,13 @@ def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_
     if verbosity == 1:
         output_progress_line(0, read_count, print_dest)
 
+    if verbosity > 3:
+        print(bold_underline('Read id table\n'),
+              file=print_dest)
+        print('<table>\n')
+        print('readid\tsampleid\trunid\tread\tch\tstart_time\tadapter\t' +
+              'full_score\tpartial_score\tposition\tstart\tend\treversed\tbarcode\tumi\n')
+
     # If single-threaded, do the work in a simple loop.
     if threads == 1:
         for read_num, read in enumerate(reads):
@@ -456,27 +467,37 @@ def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_
                                forward_or_reverse_barcodes)
             if check_barcodes:
                 read.determine_barcode(barcode_threshold, barcode_diff, require_two_barcodes)
+            read.determine_reverse()
             if verbosity == 1:
                 output_progress_line(read_num+1, read_count, print_dest)
             elif verbosity == 2:
                 print(read.formatted_start_and_end_seq(end_size, extra_trim_size, check_barcodes),
                       file=print_dest)
-            elif verbosity > 2:
+            elif verbosity == 3:
                 print(read.full_start_end_output(end_size, extra_trim_size, check_barcodes),
+                      file=print_dest)
+            elif verbosity > 3:
+                print(read.full_start_end_output(end_size, extra_trim_size, check_barcodes, umi_length),
+                      file=print_dest)
+            elif verbosity < 0:
+                print(read.full_start_end_output_tabdelim(end_size, extra_trim_size, check_barcodes),
                       file=print_dest)
 
     # If multi-threaded, use a thread pool.
     else:
         def start_end_trim_one_arg(all_args):
-            r, a, b, c, d, e, f, g, h, i, j, k, v = all_args
+            r, a, b, c, d, e, f, g, h, i, j, k, v, u = all_args
             r.find_start_trim(a, b, c, d, e, f, g, k)
             r.find_end_trim(a, b, c, d, e, f, g, k)
             if check_barcodes:
                 r.determine_barcode(h, i, j)
+            r.determine_reverse()
             if v == 2:
                 return r.formatted_start_and_end_seq(b, c, g)
-            if v > 2:
+            if v == 3:
                 return r.full_start_end_output(b, c, g)
+            if v > 3:
+                return r.full_start_end_output_tabdelim(b, c, g, u)
             else:
                 return ''
         with ThreadPool(threads) as pool:
@@ -485,7 +506,7 @@ def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_
                 arg_list.append((read, matching_sets, end_size, extra_trim_size, end_threshold,
                                  scoring_scheme_vals, min_trim_size, check_barcodes,
                                  barcode_threshold, barcode_diff, require_two_barcodes,
-                                 forward_or_reverse_barcodes, verbosity))
+                                 forward_or_reverse_barcodes, verbosity, umi_length))
             finished_count = 0
             for out in pool.imap(start_end_trim_one_arg, arg_list):
                 finished_count += 1
@@ -496,6 +517,9 @@ def find_adapters_at_read_ends(reads, matching_sets, verbosity, end_size, extra_
 
     if verbosity == 1:
         output_progress_line(read_count, read_count, print_dest, end_newline=True)
+    if verbosity > 3:
+        print('<table>\n')
+        # to retrieve table with csplit porechop.out '/^<table>$/' '{1}'
     if verbosity > 0:
         print('', file=print_dest)
 

@@ -16,6 +16,7 @@ not, see <http://www.gnu.org/licenses/>.
 
 from .cpp_function_wrappers import adapter_alignment
 from .misc import yellow, red, add_line_breaks_to_sequence, END_FORMATTING, RED, YELLOW
+import re
 
 
 class NanoporeRead(object):
@@ -106,13 +107,14 @@ class NanoporeRead(object):
             for k,v in alt_map.items():
                 bases = bases.replace(v,k)
             return bases
+        return reverse_complement(seq)
 
     def determine_reverse(self):
         # maybe in the future i need to rank the adapters?
-        start_adapters = [i.name for i in self.start_adapter_alignments if i.name in self.reversing_adapters]
-        end_adapters = [i.name for i in self.end_adapter_alignments if i.name in self.reversing_adapters]
+        start_adapters = [i[0].name for i in self.start_adapter_alignments if i[0].name in self.reversing_adapters]
+        end_adapters = [i[0].name for i in self.end_adapter_alignments if i[0].name in self.reversing_adapters]
         merged_adapters = start_adapters + end_adapters
-        if len(start_adapters) > 0:
+        if len(merged_adapters) > 0:
             self.reverse = True
 
     def get_fasta(self, min_split_read_size, discard_middle, untrimmed=False):
@@ -132,9 +134,11 @@ class NanoporeRead(object):
             fasta_str = ''
             for i, split_read_part in enumerate(self.get_split_read_parts(min_split_read_size)):
                 read_name = add_number_to_read_name(self.name, i + 1)
-                if not split_read_part[0]:  # Don't return empty sequences
-                    return ''
+                # if not split_read_part[0]:  # Don't return empty sequences
+                #     return ''
                 seq = split_read_part[0]
+                if not seq:
+                    return ''
                 if self.reverse:
                     seq = self.reverse_complement(seq)
                 seq = add_line_breaks_to_sequence(seq[0], 70)
@@ -149,11 +153,11 @@ class NanoporeRead(object):
             else:
                 seq = self.get_seq_with_start_end_adapters_trimmed()
                 quals = self.get_quals_with_start_end_adapters_trimmed()
-            if not seq:  # Don't return empty sequences
-                return ''
             if self.reverse:
                 seq = self.reverse_complement(seq)
                 quals = quals[::-1]
+            if not seq:  # Don't return empty sequences
+                return ''
             return ''.join(['@', self.name, '\n', seq, '\n+\n', quals, '\n'])
         elif discard_middle:
             return ''
@@ -262,6 +266,36 @@ class NanoporeRead(object):
                     self.middle_trim_positions.update(range(trim_start, trim_end))
                 else:
                     break
+    def find_umi(self, end_size, umi_length):
+        """
+        Returns UMI sequence, defined as matching adapter end + umi_length
+        """
+        start_seq = self.seq[:end_size]
+        if self.start_adapter_alignments:
+            for a in self.start_adapter_alignments:
+                if re.search("umi",a[0].name, re.IGNORECASE):
+                    if re.search("_r", a[0].name, re.IGNORECASE):
+                        thisstart = int(a[4])+1
+                        thisend = int(a[4])+umi_length+1
+                        if thisstart < 0:
+                            thisstart = 0
+                        if thisend >= len(start_seq):
+                            thisend = len(start_seq)-1
+                        umi = start_seq[thisstart : thisend]
+                        self.umi_call = self.reverse_complement(umi)
+        end_seq = self.seq[-end_size:]
+        if self.end_adapter_alignments:
+            for a in self.end_adapter_alignments:
+                if re.search("umi", a[0].name, re.IGNORECASE):
+                    if not re.search("_r", a[0].name, re.IGNORECASE):
+                        # make sure its the adapter with umi
+                        thisstart = int(a[3])-umi_length
+                        thisend = int(a[3])
+                        if thisstart < 0:
+                            thisstart = 0
+                        if thisend >= len(start_seq):
+                            thisend = len(start_seq)-1
+                        self.umi_call = start_seq[thisstart : thisend]
 
     def formatted_start_seq(self, end_size, extra_trim_size):
         """
@@ -371,19 +405,25 @@ class NanoporeRead(object):
             output += '    final barcode call:    ' + self.barcode_call + '\n'
         return output
 
-    def full_start_end_output_tabdelim(self, end_size, extra_trim_size, check_barcodes):
+    def full_start_end_output_tabdelim(self, end_size, extra_trim_size, check_barcodes, umi_length):
         def get_alignment_string(self, aln, position):
-            thisname = [i.split("=")[0] for i in self.name.split(" ")]
-            output = "\t".join(thisname)
-            return output += '\t' + aln[0].name + '\t' + str(aln[1]) + '\t' + \
-                   str(aln[2]) + '\t' + str(aln[3]) + '\t' + str(aln[4]) + \
+            thisname = self.name.split(" ")[0] + "\t"
+            thisname += "\t".join([i.split("=")[1] for i in self.name.split(" ")[2:]])
+            thisname += '\t' + aln[0].name + '\t' + str(aln[1]) + '\t' + \
+                   str(aln[2]) + '\t' + position + '\t' + str(aln[3]) + '\t' + \
+                   str(aln[4]) + '\t' + str(self.reverse) + '\t' + \
                    self.barcode_call + '\t' + self.umi_call
+            #print(thisname)
+            return thisname
+        output = ''
+        self.find_umi(end_size, umi_length)
         if self.start_adapter_alignments:
             for a in self.start_adapter_alignments:
-                output += get_alignment_string(a) + '\n'
+                output += get_alignment_string(self, a,"start") + '\n'
         if self.end_adapter_alignments:
             for a in self.end_adapter_alignments:
-                output += get_alignment_string(a) + '\n'
+                output += get_alignment_string(self, a,"end") + '\n'
+        return output
 
     def formatted_middle_seq(self):
         """
